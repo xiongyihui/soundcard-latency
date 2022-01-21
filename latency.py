@@ -8,7 +8,8 @@ import threading
 
 import sounddevice as sd
 import numpy as np
-import resampy
+# import resampy
+import samplerate as sr
 
 
 if len(sys.argv) == 3:
@@ -150,7 +151,12 @@ sig = recording[:, 0]
 if input_rate == output_rate:
     ref = mono
 else:
-    ref = resampy.resample(mono, output_rate, input_rate)
+    # ref = resampy.resample(mono, output_rate, input_rate)
+    converter = 'sinc_best'  # or 'sinc_medium', 'sinc_fastest', ...
+    ref = sr.resample(mono, input_rate / output_rate, converter)
+    print(f'mono {mono.shape}')
+    print(f'ref {ref.shape}')
+
 offset, cc = gcc_phat(sig, ref, fs=1)
 
 
