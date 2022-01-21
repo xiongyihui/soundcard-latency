@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import random
 import sys
 import time
 import threading
@@ -19,7 +20,7 @@ sd.default.blocksize = frame_size
 sd.default.latency = ("low", "low")
 sd.default.prime_output_buffers_using_stream_callback = True
 
-np.random.seed()
+np.random.seed(random.SystemRandom().randint(1, 1024))
 noise = np.random.normal(0, 1, rate // 10) * np.hanning(rate // 10)
 print(f"noise dtype {noise.dtype}")
 # noise = (noise.astype('float64') * (2**24)).astype('int32')
@@ -133,7 +134,7 @@ delay = (output_time - input_time) * 1000
 delay2 = (dac_time - adc_time) * 1000
 print(f"dt = {dt} ms")
 print(f"delay = {delay} ms")
-print(f"delay 2 = {delay} ms")
+print(f"delay 2 = {delay2} ms")
 print(f"system latency = {dt - delay} ms")
 print(f"system latency 2 = {dt - delay2} ms")
 
