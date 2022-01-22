@@ -37,6 +37,7 @@ sd.default.prime_output_buffers_using_stream_callback = True
 
 np.random.seed(random.SystemRandom().randint(1, 1024))
 noise = np.random.normal(0.0, 1.0, output_rate // 10) * np.hanning(output_rate // 10)
+noise /= np.amax(np.abs(noise))
 noise = noise.astype("float32")
 zeros = np.zeros(output_rate // 10, dtype="float32")
 mono = np.concatenate((zeros, noise, zeros))
