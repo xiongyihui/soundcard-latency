@@ -12,11 +12,16 @@ import numpy as np
 import samplerate as sr
 
 
-if len(sys.argv) == 3:
+if len(sys.argv) >= 3:
     sd.default.device = (int(sys.argv[1]), int(sys.argv[2]))
 elif len(sys.argv) != 1:
-    print(f"Usage: python {sys.argv[0]} input_device output_device")
+    print(f"Usage: python {sys.argv[0]} input_device output_device perid_time_ms")
     sys.exit(1)
+
+if len(sys.argv) > 3:
+    period_time_ms = int(sys.argv[3])
+else:
+    period_time_ms = 10
 
 input_device_info = sd.query_devices(sd.default.device[0])
 output_device_info = sd.query_devices(sd.default.device[1])
@@ -57,9 +62,11 @@ def callback(data, frames, t, status):
     global adc_time
 
     if not input_blocks:
-        input_time = time.time() - frames / input_rate
+        input_time = time.time()
         adc_time = t.inputBufferAdcTime
         dt = t.currentTime - t.inputBufferAdcTime
+
+        print(f"input period time {frames * 1000 / input_rate} ms")
         print(f"input latency {dt * 1000} ms")
         print(data.shape)
 
@@ -78,6 +85,7 @@ def out_callback(outdata, frames, t, status):
         output_time = time.time()
         dac_time = t.outputBufferDacTime
         dt = t.outputBufferDacTime - t.currentTime
+        print(f"output period time {frames * 1000 / output_rate} ms")
         print(f"output latency {dt * 1000} ms")
 
     if status:
@@ -99,13 +107,13 @@ event = threading.Event()
 with sd.InputStream(
     samplerate=input_rate,
     channels=input_channels,
-    blocksize=input_rate // 100,
+    blocksize=input_rate * period_time_ms // 1000,
     callback=callback,
 ):
     with sd.OutputStream(
         samplerate=output_rate,
         channels=output_channels,
-        blocksize=output_rate // 100,
+        blocksize=output_rate * period_time_ms // 1000,
         callback=out_callback,
         finished_callback=event.set,
     ):
