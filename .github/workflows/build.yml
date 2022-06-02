@@ -1,0 +1,96 @@
+name: Use PyInstaller to bundle the application
+
+on:
+  push:
+    tags:
+    - 'pre-*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Install Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.8'
+          architecture: 'x64'
+      - name: Print Versions
+        run: |
+          python --version
+          pip --version
+      - name: Install requirements
+        run: |
+          pip install -U setuptools wheel
+          pip install numpy sounddevice PyQt5==5.14.2
+          pip install git+https://github.com/pyqtgraph/pyqtgraph@develop
+          pip install git+https://github.com/pyinstaller/pyinstaller@develop
+      - name: Run PyInstaller
+        run: |
+          python -m PyInstaller soundcard-latency.spec
+      - name: See dist directory
+        run: ls dist
+      - uses: actions/upload-artifact@master
+        with:
+          name: Windows
+          path: dist/soundcard-latency.exe
+  build-windows-x86:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Install Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.8'
+          architecture: 'x86'
+      - name: Print Versions
+        run: |
+          python --version
+          pip --version
+      - name: Install requirements
+        run: |
+          pip install -U setuptools wheel
+          pip install numpy sounddevice samplerate PyQt5==5.14.2
+          pip install git+https://github.com/pyqtgraph/pyqtgraph@develop
+          pip install git+https://github.com/pyinstaller/pyinstaller@develop
+      - name: Run PyInstaller
+        run: |
+          python -m PyInstaller soundcard-latency.spec
+      - name: See dist directory
+        run: ls dist
+      - uses: actions/upload-artifact@master
+        with:
+          name: Windows-x86
+          path: dist/soundcard-latency.exe
+
+
+  build-macos:
+    runs-on: macOS-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Install Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.8'
+      - name: Print Versions
+        run: |
+          python --version
+          pip --version
+      - name: Install requirements
+        run: |
+          pip install -U setuptools wheel
+          pip install numpy sounddevice samplerate PyQt5==5.14.2
+          pip install git+https://github.com/pyqtgraph/pyqtgraph@develop
+          pip install git+https://github.com/pyinstaller/pyinstaller@develop
+      - name: Run PyInstaller
+        run: |
+          python -m PyInstaller -F -w -n soundcard-latency.app app.py
+      - name: See dist directory
+        run: ls dist
+      - uses: actions/upload-artifact@master
+        with:
+          name: macOS
+          path: dist/soundcard-latency.app
