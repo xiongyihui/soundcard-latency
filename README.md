@@ -1,6 +1,7 @@
 Soundcard Latency
 =================
 
+[![build](https://github.com/xiongyihui/soundcard-latency/actions/workflows/build.yml/badge.svg)](https://github.com/xiongyihui/soundcard-latency/actions/workflows/build.yml)
 
 A tool to check the latency of a sound card.
 
