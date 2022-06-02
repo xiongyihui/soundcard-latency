@@ -33,7 +33,7 @@ jobs:
         run: ls dist
       - uses: actions/upload-artifact@master
         with:
-          name: Windows
+          name: soundcard-latency-windows
           path: dist/soundcard-latency.exe
   build-windows-x86:
     runs-on: windows-latest
@@ -62,7 +62,7 @@ jobs:
         run: ls dist
       - uses: actions/upload-artifact@master
         with:
-          name: Windows-x86
+          name: soundcard-latency-windows-x86
           path: dist/soundcard-latency.exe
 
 
@@ -92,5 +92,5 @@ jobs:
         run: ls dist
       - uses: actions/upload-artifact@master
         with:
-          name: macOS
+          name: soundcard-latency-macos
           path: dist/soundcard-latency.app
