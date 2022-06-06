@@ -1,4 +1,4 @@
-name: Use PyInstaller to bundle the application
+name: Binary Build
 
 on:
   push:
