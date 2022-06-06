@@ -18,6 +18,12 @@ import pyqtgraph as pg
 import sounddevice as sd
 
 
+if getattr(sys, 'frozen', False):
+    application_path = os.path.dirname(sys.executable)
+elif __file__:
+    application_path = os.path.dirname(__file__)
+
+
 sd.default.latency = ("low", "low")
 sd.default.prime_output_buffers_using_stream_callback = True
 
@@ -309,21 +315,22 @@ class MainWindow(pg.QtGui.QMainWindow):
         refreshAction.triggered.connect(self.refresh)
         self.toolbar.addAction(refreshAction)
 
-        self.toolbar.addWidget(pg.QtGui.QLabel(" 🧩 "))
+        # self.toolbar.addWidget(pg.QtGui.QLabel(" 🧩 "))
 
         self.apiComboBox = ComboBox()
+        self.apiComboBox.setMaximumWidth(24)
         self.toolbar.addWidget(self.apiComboBox)
 
-        self.toolbar.addWidget(pg.QtGui.QLabel(" 🔊 "))
+        # self.toolbar.addWidget(pg.QtGui.QLabel(" 🔈 "))
 
         self.outputComboBox = ComboBox()
-        self.outputComboBox.setMaximumWidth(240)
+        # self.outputComboBox.setMaximumWidth(240)
         self.toolbar.addWidget(self.outputComboBox)
 
-        self.toolbar.addWidget(pg.QtGui.QLabel(" 🎤 "))
+        # self.toolbar.addWidget(pg.QtGui.QLabel(" 🎤 "))
 
         self.inputComboBox = ComboBox()
-        self.inputComboBox.setMaximumWidth(240)
+        # self.inputComboBox.setMaximumWidth(240)
         self.toolbar.addWidget(self.inputComboBox)
 
         # ▶️
@@ -355,7 +362,15 @@ class MainWindow(pg.QtGui.QMainWindow):
         infoAction.setToolTip("Help (?)")
         infoAction.setShortcut("Shift+/")
         infoAction.triggered.connect(self.showInfo)
-        # self.toolbar.addAction(infoAction)
+        self.toolbar.addAction(infoAction)
+
+        self.toolbar.setStyleSheet(
+            "QToolButton {color: #20C020}"
+            "QComboBox {color: #20C020; background: #212121; padding: 2px; border: none}"
+            "QComboBox::drop-down {border: none; width: 0px}"
+            "QListView {color: #20C020; background: #212121; border: none; min-width: 160px;}"
+            "QPushButton {color: #212121; background: #20A020; border: none; border-radius: 2px; padding: 2px 24px; margin: 0px 16px}"
+            "QToolBar {background: #212121; border: 2px solid #212121}")
 
         self.device_manager = DeviceManager.get_instance()
 
@@ -368,19 +383,22 @@ class MainWindow(pg.QtGui.QMainWindow):
 
     def setup(self):
         self.apiComboBox.clear()
-        self.apiComboBox.addItems(self.device_manager.api_list)
+        api_list = map(lambda api: "🧩 " + api, self.device_manager.api_list)
+        self.apiComboBox.addItems(api_list)
         self.apiComboBox.setCurrentIndex(self.device_manager.api_index)
 
         self.inputComboBox.clear()
-        self.inputComboBox.addItems(self.device_manager.input_list)
+        input_list = map(lambda api: "🎤 " + api, self.device_manager.input_list)
+        self.inputComboBox.addItems(input_list)
         self.inputComboBox.setCurrentIndex(self.device_manager.default_input_index)
 
         self.outputComboBox.clear()
-        self.outputComboBox.addItems(self.device_manager.output_list)
+        output_list = map(lambda api: "🔈 " + api, self.device_manager.output_list)
+        self.outputComboBox.addItems(output_list)
         self.outputComboBox.setCurrentIndex(self.device_manager.default_output_index)
 
     def refresh(self):
-        api = self.apiComboBox.currentText()
+        api = self.apiComboBox.currentText()[2:]
         self.device_manager.scan(api)
         self.on_api_changed(api)
 
@@ -388,11 +406,13 @@ class MainWindow(pg.QtGui.QMainWindow):
         self.device_manager.scan(api)
 
         self.inputComboBox.clear()
-        self.inputComboBox.addItems(self.device_manager.input_list)
-        self.apiComboBox.setCurrentIndex(self.device_manager.api_index)
+        input_list = map(lambda api: "🎤 " + api, self.device_manager.input_list)
+        self.inputComboBox.addItems(input_list)
+        self.inputComboBox.setCurrentIndex(self.device_manager.default_input_index)
 
         self.outputComboBox.clear()
-        self.outputComboBox.addItems(self.device_manager.output_list)
+        output_list = map(lambda api: "🔈 " + api, self.device_manager.output_list)
+        self.outputComboBox.addItems(output_list)
         self.outputComboBox.setCurrentIndex(self.device_manager.default_output_index)
 
     def display(self, error):
@@ -422,8 +442,8 @@ class MainWindow(pg.QtGui.QMainWindow):
         if self.task.isRunning():
             return
         self.widget.getPlotItem().clear()
-        output_device = self.outputComboBox.currentText()
-        input_device = self.inputComboBox.currentText()
+        output_device = self.outputComboBox.currentText()[2:]
+        input_device = self.inputComboBox.currentText()[2:]
         # self.task.test(0, 0)
 
         self.widget.setTitle(
