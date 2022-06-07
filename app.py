@@ -15,17 +15,15 @@ import wave
 import numpy as np
 import pyqtgraph as pg
 
+
 import sounddevice as sd
-
-
-if getattr(sys, 'frozen', False):
-    application_path = os.path.dirname(sys.executable)
-elif __file__:
-    application_path = os.path.dirname(__file__)
-
 
 sd.default.latency = ("low", "low")
 sd.default.prime_output_buffers_using_stream_callback = True
+
+
+data_dir = os.path.dirname(os.path.abspath(__file__))
+app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else data_dir
 
 
 # convolve with fft, not depend on scipy
@@ -76,11 +74,15 @@ class DeviceManager:
         return DeviceManager._instance
 
     def __init__(self):
+        self.initialized = False
         self.scan()
 
     def scan(self, api="Windows WASAPI"):
-        sd._terminate()
-        sd._initialize()
+        if self.initialized:
+            sd._terminate()
+            sd._initialize()
+        self.initialized = True
+
         self.apis = sd.query_hostapis()
         self.devices = sd.query_devices()
 
@@ -130,6 +132,8 @@ class Task(pg.QtCore.QThread):
         self.input_blocks = []
         self.output_index = 0
         self.output_data = []
+        self.voice = None
+        self.use_voice = True
 
     def on_input(self, data, frames, t, status):
         if not self.input_blocks:
@@ -157,9 +161,10 @@ class Task(pg.QtCore.QThread):
         else:
             outdata[:, :] = data
 
-    def test(self, output_name, input_name):
+    def test(self, output_name, input_name, use_voice=True):
         self.output_name = output_name
         self.input_name = input_name
+        self.use_voice = use_voice
         self.start()
 
     def run(self):
@@ -171,6 +176,8 @@ class Task(pg.QtCore.QThread):
         self.finished.emit(result)
 
     def exec(self):
+        import samplerate as sr
+
         device_manager = DeviceManager.get_instance()
         input_idx = device_manager.input_list.index(self.input_name)
         input_idx = device_manager.devices.index(
@@ -181,23 +188,61 @@ class Task(pg.QtCore.QThread):
             device_manager.output_devices[output_idx]
         )
 
-        input_rate, output_rate = 48000, 48000
         input_channels = device_manager.devices[input_idx]['max_input_channels']
         output_channels = device_manager.devices[output_idx]['max_output_channels']
         period_time_ms = 4
 
+        rates = (48000, 16000, 44100)
+        for rate in rates:
+            try:
+                sd.check_input_settings(input_idx, samplerate=rate)
+                input_rate = rate
+                break
+            except sd.PortAudioError:
+                pass
+        else:
+            raise ValueError('The input device does not support 48000, 16000, 44100')
+
+        for rate in rates:
+            try:
+                sd.check_output_settings(output_idx, samplerate=rate)
+                output_rate = rate
+                break
+            except sd.PortAudioError:
+                pass
+        else:
+            raise ValueError('The output device does not support 48000, 16000, 44100')
+
+        print(f'rate: {(input_rate, output_rate)}')
+
         print(f'channels: {(input_channels, output_channels)}')
 
-        np.random.seed(random.SystemRandom().randint(1, 1024))
-        noise = np.random.normal(0.0, 1.0, output_rate // 5) * np.hanning(
-            output_rate // 5
-        )
-        noise /= np.amax(np.abs(noise))
-        noise = noise.astype("float32")
+        if self.use_voice:
+            if self.voice is None:
+                wav = wave.open(os.path.join(data_dir, 'test.wav'), 'rb')
+                wav_data = wav.readframes(wav.getnframes())
+                wav_rate = wav.getframerate()
+                wav.close()
+                ref = np.frombuffer(wav_data, dtype='int16').astype('float32') / (2**15)
+                if output_rate != wav_rate:
+                    converter = 'sinc_best'  # or 'sinc_medium', 'sinc_fastest', ...
+                    ref = sr.resample(ref, output_rate / wav_rate, converter)
+                self.voice = ref
+            else:
+                ref = self.voice
+        else:
+            np.random.seed(random.SystemRandom().randint(1, 1024))
+            noise = np.random.normal(0.0, 1.0, output_rate // 4) * np.hanning(
+                output_rate // 4
+            )
+            noise /= np.amax(np.abs(noise))
+            ref = noise.astype("float32")
+
         zeros = np.zeros(output_rate // 10, dtype="float32")
-        mono = np.concatenate((zeros, noise, zeros))
+        mono = np.concatenate((zeros, ref, zeros))
         source = np.zeros((len(mono), output_channels), dtype="float32")
         source[:, 0] = mono
+        source[:, 1] = mono
         self.output_data = source
         self.output_index = 0
         
@@ -228,17 +273,10 @@ class Task(pg.QtCore.QThread):
         recording = np.concatenate(self.input_blocks)
         print(recording.shape)
 
-
-        ref = mono
         sig = recording[:, 0] if input_channels > 1 else recording.flatten()
-        # if input_rate == output_rate:
-        #     ref = mono
-        # else:
-        #     # ref = resampy.resample(mono, output_rate, input_rate)
-        #     converter = 'sinc_best'  # or 'sinc_medium', 'sinc_fastest', ...
-        #     ref = sr.resample(mono, input_rate / output_rate, converter)
-        #     print(f'mono {mono.shape}')
-        #     print(f'ref {ref.shape}')
+        if input_rate != output_rate:
+            converter = 'sinc_best'  # or 'sinc_medium', 'sinc_fastest', ...
+            ref = sr.resample(ref, input_rate / output_rate, converter)
 
         offset, cc = gcc_phat(sig, ref, fs=1)
 
@@ -309,16 +347,22 @@ class MainWindow(pg.QtGui.QMainWindow):
         self.toolbar = self.addToolBar("toolbar")
         self.toolbar.setMovable(False)
 
-        refreshAction = pg.QtGui.QAction("↻", self)
-        refreshAction.setToolTip("Rresh (r)")
-        refreshAction.setShortcut("r")
-        refreshAction.triggered.connect(self.refresh)
-        self.toolbar.addAction(refreshAction)
+        self.signalAction = pg.QtGui.QAction(" ⚂ ", self)
+        self.signalAction.setToolTip("Use random signal")
+        self.signalAction.setCheckable(True)
+        # self.signalAction.triggered.connect(self.use_random_signal)
+        self.toolbar.addAction(self.signalAction)
+
+        rescanAction = pg.QtGui.QAction("↻", self)
+        rescanAction.setToolTip("Rescan sound cards")
+        rescanAction.triggered.connect(self.rescan)
+        self.toolbar.addAction(rescanAction)
+
 
         # self.toolbar.addWidget(pg.QtGui.QLabel(" 🧩 "))
 
         self.apiComboBox = ComboBox()
-        self.apiComboBox.setMaximumWidth(24)
+        self.apiComboBox.setMaximumWidth(20)
         self.toolbar.addWidget(self.apiComboBox)
 
         # self.toolbar.addWidget(pg.QtGui.QLabel(" 🔈 "))
@@ -369,7 +413,7 @@ class MainWindow(pg.QtGui.QMainWindow):
             "QComboBox {color: #20C020; background: #212121; padding: 2px; border: none}"
             "QComboBox::drop-down {border: none; width: 0px}"
             "QListView {color: #20C020; background: #212121; border: none; min-width: 160px;}"
-            "QPushButton {color: #212121; background: #20A020; border: none; border-radius: 2px; padding: 2px 24px; margin: 0px 16px}"
+            "QPushButton {color: #212121; background: #20A020; border: none; border-radius: 2px; padding: 2px 24px; margin: 0px 8px}"
             "QToolBar {background: #212121; border: 2px solid #212121}")
 
         self.device_manager = DeviceManager.get_instance()
@@ -397,7 +441,7 @@ class MainWindow(pg.QtGui.QMainWindow):
         self.outputComboBox.addItems(output_list)
         self.outputComboBox.setCurrentIndex(self.device_manager.default_output_index)
 
-    def refresh(self):
+    def rescan(self):
         api = self.apiComboBox.currentText()[2:]
         self.device_manager.scan(api)
         self.on_api_changed(api)
@@ -451,7 +495,8 @@ class MainWindow(pg.QtGui.QMainWindow):
         )
 
         print((output_device, input_device))
-        self.task.test(output_device, input_device)
+        use_voice = not self.signalAction.isChecked()
+        self.task.test(output_device, input_device, use_voice)
 
     def showInfo(self):
         pg.QtGui.QDesktopServices.openUrl(
