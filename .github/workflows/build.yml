@@ -23,7 +23,7 @@ jobs:
       - name: Install requirements
         run: |
           pip install -U setuptools wheel
-          pip install numpy sounddevice PyQt5==5.14.2
+          pip install numpy sounddevice samplerate PyQt5==5.14.2
           pip install git+https://github.com/pyqtgraph/pyqtgraph@develop
           pip install git+https://github.com/pyinstaller/pyinstaller@develop
       - name: Run PyInstaller
