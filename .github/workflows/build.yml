@@ -87,7 +87,7 @@ jobs:
           pip install git+https://github.com/pyinstaller/pyinstaller@develop
       - name: Run PyInstaller
         run: |
-          python -m PyInstaller -F -w -n soundcard-latency.app app.py
+          python -m PyInstaller -F -w --add-data="test.wav:." -n soundcard-latency.app app.py
       - name: See dist directory
         run: ls dist
       - uses: actions/upload-artifact@master
