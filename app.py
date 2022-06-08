@@ -282,26 +282,26 @@ class Task(pg.QtCore.QThread):
         offset, cc = gcc_phat(sig, ref, fs=1)
 
         zeros_size = int(len(zeros) * input_rate / output_rate)
-        dt = (offset - zeros_size) * 1000 / input_rate
-        delay = (self.output_time - self.input_time) * 1000 - period_time_ms
-        latency = dt - delay
-        print(f"dt = {dt} ms")
+        print((offset, zeros_size))
+        delay = (self.output_time - self.input_time) * 1000 - period_time_ms +  zeros_size * 1000 / input_rate
+        delay_samples = int(delay * input_rate / 1000)
+
+        origin = int((len(sig) + len(ref)) // 2) + delay_samples
+        r1 = origin
+        r2 = origin + input_rate
+
+        offset = np.argmax(np.abs(cc[r1:r2]))
+        
+        latency = offset * 1000 / input_rate
         print(f"delay = {delay} ms")
         print(f"latency = {latency} ms")
 
-        offset = int(offset)
-        zero_point = int((len(sig) + len(ref)) // 2) + zeros_size
-        peak_point = zero_point + offset
-        t = np.linspace(0, len(cc), len(cc), endpoint=False) - zero_point
-        t = t * 1000 / input_rate
-        t -= delay
-
-        print((offset, peak_point - zero_point))
+        print(offset)
 
         print(f'len(cc) = {len(cc)}')
         self.latency = latency
-        self.x = t[zero_point:]
-        self.y = cc[zero_point:]
+        self.x = np.linspace(0, 1000, r2 - r1, endpoint=False)
+        self.y = cc[r1:r2]
 
         print("done")
 
@@ -319,17 +319,19 @@ class ComboBox(pg.QtGui.QComboBox):
 class MainWindow(pg.QtGui.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowIcon(self.style().standardIcon(pg.QtGui.QStyle.SP_MediaPlay))
+        # self.setWindowIcon(self.style().standardIcon(pg.QtGui.QStyle.SP_MediaPlay))
         self.setWindowTitle("Soundcard Latency 🎵")
         self.resize(1024, 640)
         self.widget = pg.PlotWidget()
         self.setCentralWidget(self.widget)
 
-        self.widget.setLabel("bottom", "t/ms")
+        self.widget.setLabel("bottom", "t / ms")
 
         # self.widget.showButtons()
 
-        self.widget.setXRange(0, 1000)
+        self.widget.setXRange(0, 1000, padding=0)
+
+        self.pen = pg.mkPen(color=(0, 0xC0, 0))
 
 
         # self.widget.setXRange(np.log10(100), np.log10(8000), padding=0)
@@ -468,15 +470,15 @@ class MainWindow(pg.QtGui.QMainWindow):
         plot = self.widget.getPlotItem()
         plot.clear()
 
-        plot.plot(self.task.x, self.task.y)
+        plot.plot(self.task.x, self.task.y, pen=self.pen)
 
-        vertical = pg.InfiniteLine(pos=self.task.latency, angle=90, movable=False)
+        vertical = pg.InfiniteLine(pos=self.task.latency, angle=90, movable=True)
         plot.addItem(vertical, ignoreBounds=True)
 
-        self.widget.setXRange(0, self.task.latency * 3)
+        self.widget.setXRange(0, ((self.task.latency + 200) // 200) * 200, padding=0)
         self.widget.setLimits(xMin=self.task.x[0], xMax=self.task.x[-1])
 
-        self.widget.setTitle(f"latency: {self.task.latency}")
+        self.widget.setTitle(f"latency: {np.around(self.task.latency, decimals=2)} ms")
 
         print("update data")
 
