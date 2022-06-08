@@ -170,9 +170,10 @@ class Task(pg.QtCore.QThread):
     def run(self):
         try:
             result = self.exec()
-        except Exception:
+        except Exception as e:
             traceback.print_exc()
             result = -1
+            self.error = e
         self.finished.emit(result)
 
     def exec(self):
@@ -280,8 +281,8 @@ class Task(pg.QtCore.QThread):
 
         offset, cc = gcc_phat(sig, ref, fs=1)
 
-
-        dt = offset * 1000 / input_rate
+        zeros_size = int(len(zeros) * input_rate / output_rate)
+        dt = (offset - zeros_size) * 1000 / input_rate
         delay = (self.output_time - self.input_time) * 1000 - period_time_ms
         latency = dt - delay
         print(f"dt = {dt} ms")
@@ -289,7 +290,7 @@ class Task(pg.QtCore.QThread):
         print(f"latency = {latency} ms")
 
         offset = int(offset)
-        zero_point = int((len(sig) + len(ref)) // 2)
+        zero_point = int((len(sig) + len(ref)) // 2) + zeros_size
         peak_point = zero_point + offset
         t = np.linspace(0, len(cc), len(cc), endpoint=False) - zero_point
         t = t * 1000 / input_rate
@@ -461,7 +462,7 @@ class MainWindow(pg.QtGui.QMainWindow):
 
     def display(self, error):
         if error:
-            msg = '<font style="font-size:32px; color:red">Error</font>'
+            msg = f'<font style="font-size:32px; color:red">{self.task.error}</font>'
             self.widget.setTitle(msg)
             return
         plot = self.widget.getPlotItem()
