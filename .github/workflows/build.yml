@@ -3,7 +3,7 @@ name: Binary Build
 on:
   push:
     tags:
-    - 'pre-*'
+    - '*'
 
 jobs:
   build-windows:
