@@ -5,14 +5,19 @@ Soundcard Latency
 
 A tool to check the latency of a sound card.
 
+![](screenshot.png)
 
-## Requirements
+Download the application from [![build](https://github.com/xiongyihui/soundcard-latency/actions/workflows/build.yml/badge.svg)](https://github.com/xiongyihui/soundcard-latency/actions/workflows/build.yml).
+
+## Advance
+### Requirements
 + python3
 + numpy
 + python-sounddevice
++ samplerate
 + matplotlib
 
-## Get started
+### Get started with `latency.py`
 +   Measure the default input and output devices.
 
     ```
