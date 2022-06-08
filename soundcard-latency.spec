@@ -2,10 +2,18 @@
 
 block_cipher = None
 
+import os
+import sys
+
+import samplerate as sr
+
+sr_dir = os.path.dirname(sr.__file__)
+sr_dll = 'libsamplerate-64bit.dll' if sys.maxsize > 2**32 else 'libsamplerate-32bit.dll'
+sr_dll_path = os.path.join(sr_dir, '_samplerate_data', sr_dll)
 
 a = Analysis(['app.py'],
              binaries=[],
-             datas=[('test.wav', '.')],
+             datas=[('test.wav', '.'), (sr_dll_path, 'samplerate/_samplerate_data')],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
