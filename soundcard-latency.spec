@@ -5,7 +5,7 @@ block_cipher = None
 
 a = Analysis(['app.py'],
              binaries=[],
-             datas=[],
+             datas=[('test.wav', '.')],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
