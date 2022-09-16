@@ -233,11 +233,15 @@ class Task(pg.QtCore.QThread):
                 ref = self.voice
         else:
             np.random.seed(random.SystemRandom().randint(1, 1024))
-            noise = np.random.normal(0.0, 1.0, output_rate // 4) * np.hanning(
-                output_rate // 4
-            )
+            noise_length = output_rate
+            noise = np.random.normal(0.0, 1.0, noise_length)
+            fade_size = noise_length // 4
+            fade_in = np.sin(np.pi * np.arange(fade_size) / fade_size / 2)
+            fade_out = fade_in[::-1]
+            noise[:fade_size] *= fade_in
+            noise[-fade_size:] *= fade_out
             noise /= np.amax(np.abs(noise))
-            ref = noise.astype("float32")
+            ref = noise
 
         zeros = np.zeros(output_rate // 10, dtype="float32")
         mono = np.concatenate((zeros, ref, zeros))
