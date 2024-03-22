@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import datetime
-import json
 import os
-import pathlib
 import random
 import sys
 import time
@@ -14,9 +11,9 @@ import wave
 
 import numpy as np
 import pyqtgraph as pg
-
-
 import sounddevice as sd
+import samplerate as sr
+
 
 sd.default.latency = ("low", "low")
 sd.default.prime_output_buffers_using_stream_callback = True
@@ -177,8 +174,6 @@ class Task(pg.QtCore.QThread):
         self.finished.emit(result)
 
     def exec(self):
-        import samplerate as sr
-
         device_manager = DeviceManager.get_instance()
         input_idx = device_manager.input_list.index(self.input_name)
         input_idx = device_manager.devices.index(
@@ -300,7 +295,20 @@ class Task(pg.QtCore.QThread):
         print(f"delay = {delay} ms")
         print(f"latency = {latency} ms")
 
-        print(offset)
+        samples_1ms = 1 * input_rate // 1000
+        r21 = r1 + offset + 2 * samples_1ms
+        r22 = min(r2, r21 + samples_1ms * 100)
+        second_peak = np.argmax(np.abs(cc[r21:r22]))
+        second_peak_interval = (second_peak + 2 * samples_1ms) * 1000 / input_rate
+    
+        self.second_peak_interval = second_peak_interval
+
+
+        previous_peak = np.argmax(np.abs(cc[r1 : r1 + offset - 2 * samples_1ms]))
+        previous_peak_interval = (offset - 2 * previous_peak) * 1000 / input_rate
+        print(
+            f"previous peak {previous_peak_interval} ms, second peak {second_peak_interval} ms"
+        )
 
         print(f'len(cc) = {len(cc)}')
         self.latency = latency
@@ -312,7 +320,7 @@ class Task(pg.QtCore.QThread):
         return 0
 
 
-class ComboBox(pg.QtGui.QComboBox):
+class ComboBox(pg.QtWidgets.QComboBox):
     clicked = pg.QtCore.Signal()
 
     def showPopup(self):
@@ -320,11 +328,11 @@ class ComboBox(pg.QtGui.QComboBox):
         super(ComboBox, self).showPopup()
 
 
-class MainWindow(pg.QtGui.QMainWindow):
+class MainWindow(pg.QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        # self.setWindowIcon(self.style().standardIcon(pg.QtGui.QStyle.SP_MediaPlay))
-        self.setWindowTitle("Soundcard Latency 🎵")
+        # self.setWindowIcon(self.style().standardIcon(pg.QtWidgets.QStyle.SP_MediaPlay))
+        self.setWindowTitle("Sound Latency 🎵")
         self.resize(1024, 640)
         self.widget = pg.PlotWidget()
         self.setCentralWidget(self.widget)
@@ -391,17 +399,17 @@ class MainWindow(pg.QtGui.QMainWindow):
         startAction.triggered.connect(self.start)
         # self.toolbar.addAction(startAction)
 
-        button = pg.QtGui.QPushButton("▶️")
+        button = pg.QtWidgets.QPushButton("▶️")
         self.toolbar.addWidget(button)
         button.clicked.connect(self.start)
 
-        spacer = pg.QtGui.QWidget()
+        spacer = pg.QtWidgets.QWidget()
         spacer.setSizePolicy(
-            pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Preferred
+            pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Preferred
         )
         self.toolbar.addWidget(spacer)
 
-        pinAction = pg.QtGui.QAction("📌", self)
+        pinAction = pg.QtGui.QAction("📌 ", self)
         pinAction.setToolTip("Always On Top (Ctrl+t)")
         pinAction.setShortcut("Ctrl+t")
         pinAction.setCheckable(True)
@@ -482,7 +490,11 @@ class MainWindow(pg.QtGui.QMainWindow):
         self.widget.setXRange(0, ((self.task.latency + 200) // 200) * 200, padding=0)
         self.widget.setLimits(xMin=self.task.x[0], xMax=self.task.x[-1])
 
-        self.widget.setTitle(f"latency: {np.around(self.task.latency, decimals=2)} ms")
+        # self.widget.setTitle(f"latency: {np.around(self.task.latency, decimals=2)} ms")
+
+        self.widget.setTitle(
+            f"1st peak: {np.around(self.task.latency, decimals=2)} ms, 2nd peak +{np.around(self.task.second_peak_interval, decimals=2)} ms"
+        )
 
         print("update data")
 
@@ -522,7 +534,7 @@ class MainWindow(pg.QtGui.QMainWindow):
 
 
 def main():
-    app = pg.QtGui.QApplication(sys.argv)
+    app = pg.QtWidgets.QApplication(sys.argv)
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
